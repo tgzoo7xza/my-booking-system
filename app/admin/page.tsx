@@ -1,7 +1,8 @@
 "use client";
 import { useState, useEffect, useCallback } from "react";
 import { supabase } from "@/lib/supabase";
-import { useRouter } from "next/navigation"; // 1. เพิ่ม useRouter
+import { useRouter } from "next/navigation";
+import Swal from "sweetalert2";
 
 const TIME_SLOTS = [
   "10:00", "10:30", "11:00", "11:30", "12:00", "12:30",
@@ -11,7 +12,7 @@ const TIME_SLOTS = [
 ];
 
 export default function AdminPage() {
-  const router = useRouter(); // 2. เรียกใช้ router
+  const router = useRouter();
   const [date, setDate] = useState(() => {
     return new Intl.DateTimeFormat('fr-CA', { 
       year: 'numeric', month: '2-digit', day: '2-digit' 
@@ -25,28 +26,30 @@ export default function AdminPage() {
     phone?: string,
     hair_style?: string
   }[]>([]);
-  const [loading, setLoading] = useState(true); // เริ่มต้นเป็น true เพื่อเช็คสิทธิ์ก่อน
+  const [loading, setLoading] = useState(true);
 
-  // 3. เพิ่มระบบตรวจสอบสิทธิ์ Admin
+  // 1. ตรวจสอบสิทธิ์ Admin (ใช้ Email ของคุณ)
   useEffect(() => {
     const checkAdmin = async () => {
       const { data: { session } } = await supabase.auth.getSession();
-      
-      // *** สำคัญ: เปลี่ยน 'your-email@gmail.com' เป็น Email ที่คุณสมัครไว้ใน Supabase ***
       const adminEmail = "fortune02548@gmail.com"; 
 
       if (!session || session.user.email !== adminEmail) {
-        alert("ขออภัย เฉพาะช่างเท่านั้นที่เข้าหน้านี้ได้");
+        Swal.fire({
+          title: "ปฏิเสธการเข้าถึง",
+          text: "เฉพาะผู้ดูแลร้านเท่านั้นที่สามารถเข้าถึงหน้านี้ได้",
+          icon: "error",
+          confirmButtonColor: "#0f172a"
+        });
         router.push("/login");
       } else {
-        setLoading(false); // ถ้าเป็น Admin จริงค่อยให้โหลดข้อมูล
+        setLoading(false);
       }
     };
     checkAdmin();
   }, [router]);
 
   const fetchSlots = useCallback(async () => {
-    // ไม่ต้อง setLoading(true) ซ้ำ เพราะเราคุมด้วย loading ด้านบนแล้ว
     try {
       const { data, error } = await supabase
         .from("bookings")
@@ -72,6 +75,21 @@ export default function AdminPage() {
   }, [fetchSlots, loading]);
 
   const toggleSlot = async (time: string, currentBooking?: any) => {
+    if (currentBooking && currentBooking.status !== "blocked") {
+      const result = await Swal.fire({
+        title: "ยืนยันการยกเลิก?",
+        text: `คุณต้องการยกเลิกคิวของคุณ ${currentBooking.name} หรือไม่?`,
+        icon: "warning",
+        showCancelButton: true,
+        confirmButtonColor: "#ef4444",
+        cancelButtonColor: "#64748b",
+        confirmButtonText: "ใช่, ยกเลิกคิวนี้",
+        cancelButtonText: "ย้อนกลับ",
+        customClass: { popup: "rounded-[2rem]" }
+      });
+      if (!result.isConfirmed) return;
+    }
+
     try {
       if (currentBooking) {
         const { error } = await supabase
@@ -87,47 +105,81 @@ export default function AdminPage() {
             user_id: user?.id || null,
             booking_date: date,
             booking_time: time,
-            customer_name: "📢 ช่างปิดรับคิว",
+            customer_name: "📢 ปิดรับคิว",
             status: "blocked",
             phone: "-",
-            hair_style: "🚫 ปิดรับบริการ"
+            hair_style: "🚫 ช่างไม่ว่าง"
           }]);
         if (error) throw error;
       }
       await fetchSlots();
     } catch (err: any) {
-      alert("ไม่สามารถดำเนินการได้: " + err.message);
+      Swal.fire("ผิดพลาด", "ไม่สามารถดำเนินการได้: " + err.message, "error");
     }
   };
 
-  // ถ้ากำลังโหลด (หรือกำลังเช็คสิทธิ์) ให้แสดงหน้าว่างๆ หรือ Loading
-  if (loading) return <div className="min-h-screen flex items-center justify-center">กำลังตรวจสอบสิทธิ์...</div>;
+  if (loading) return (
+    <div className="min-h-screen flex flex-col items-center justify-center bg-[#fafafa]">
+      <div className="w-12 h-12 border-4 border-blue-600 border-t-transparent rounded-full animate-spin mb-4"></div>
+      <p className="font-black text-slate-900 tracking-widest uppercase text-xs">กำลังตรวจสอบสิทธิ์ผู้ดูแล...</p>
+    </div>
+  );
+
+  const customerCount = bookedSlots.filter(b => b.status !== 'blocked').length;
+  const blockedCount = bookedSlots.filter(b => b.status === 'blocked').length;
 
   return (
-    <main className="min-h-screen bg-slate-50 p-4 md:p-10">
-       {/* UI เหมือนเดิมของคุณเลยครับ */}
-      <div className="max-w-5xl mx-auto space-y-8">
+    <main className="min-h-screen bg-[#fafafa] p-6 md:p-12 selection:bg-blue-100 relative">
+      <div className="max-w-6xl mx-auto space-y-8 animate-fade-in">
         
-        <div className="bg-white rounded-[2.5rem] shadow-sm border p-8">
-          <div className="flex flex-col md:flex-row md:items-center justify-between gap-4 mb-10">
-            <div>
-              <h1 className="text-3xl font-black text-slate-900">⚙️ จัดการเวลาเข้าใช้บริการ</h1>
-              <p className="text-slate-500">เลือกวันที่เพื่อเปิด-ปิดรับจองคิว</p>
-            </div>
-            <div className="flex items-center gap-2">
-              <input 
-                type="date" value={date} 
-                onChange={(e) => setDate(e.target.value)}
-                className="p-4 bg-slate-100 rounded-2xl border-none outline-none ring-2 ring-blue-500 font-bold"
-              />
-              {/* ปุ่ม Logout เพิ่มความสะดวก */}
-              <button 
-                onClick={async () => { await supabase.auth.signOut(); router.push("/login"); }}
-                className="p-4 bg-rose-100 text-rose-600 rounded-2xl font-bold hover:bg-rose-200 transition-colors"
-              >
-                ออกจากระบบ
-              </button>
-            </div>
+        {/* --- DASHBOARD HEADER --- */}
+        <header className="flex flex-col md:flex-row md:items-end justify-between gap-6">
+          <div>
+            <p className="text-[10px] font-black text-blue-600 uppercase tracking-[0.3em] mb-2">ระบบจัดการหลังบ้าน</p>
+            <h1 className="text-4xl font-black text-slate-950 tracking-tighter uppercase">แดชบอร์ด<span className="text-blue-600">.</span></h1>
+          </div>
+          <div className="flex items-center gap-3">
+            <input 
+              type="date" value={date} 
+              onChange={(e) => setDate(e.target.value)}
+              className="px-6 py-4 bg-white rounded-2xl border border-slate-200 outline-none ring-4 ring-blue-500/5 focus:border-blue-600 font-black transition-all"
+            />
+            <button 
+              onClick={async () => { await supabase.auth.signOut(); router.push("/"); }}
+              className="p-4 bg-slate-950 text-white rounded-2xl font-black hover:bg-blue-600 transition-all text-xs uppercase tracking-widest"
+            >
+              ออกจากระบบ
+            </button>
+          </div>
+        </header>
+
+        {/* --- STAT CARDS --- */}
+        <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
+          <div className="bg-blue-600 text-white p-8 rounded-[3rem] shadow-xl shadow-blue-100 relative overflow-hidden group">
+            <p className="text-blue-100 text-[10px] font-black uppercase tracking-widest mb-2">คิวจองวันนี้</p>
+            <h3 className="text-5xl font-black">{customerCount} <span className="text-xl font-normal">คิว</span></h3>
+            <div className="absolute -right-4 -bottom-4 opacity-20 text-7xl group-hover:scale-110 transition-transform">📅</div>
+          </div>
+          
+          <div className="bg-white border border-slate-200 p-8 rounded-[3rem] shadow-sm">
+            <p className="text-slate-400 text-[10px] font-black uppercase tracking-widest mb-2">ช่วงเวลาที่ปิดรับ</p>
+            <h3 className="text-5xl font-black text-slate-950">{blockedCount} <span className="text-xl font-normal">ช่วง</span></h3>
+          </div>
+
+          <div className="bg-slate-950 text-white p-8 rounded-[3rem] flex flex-col justify-center relative overflow-hidden">
+             <p className="text-slate-400 text-[10px] font-black uppercase tracking-widest mb-2">สถานะเซิร์ฟเวอร์</p>
+             <h3 className="text-lg font-black text-green-400 flex items-center gap-2 uppercase">
+                <span className="w-2 h-2 bg-green-400 rounded-full animate-pulse"></span>
+                ออนไลน์ปกติ
+             </h3>
+          </div>
+        </div>
+
+        {/* --- TIME SLOT MANAGER --- */}
+        <div className="bg-white rounded-[3.5rem] shadow-[0_32px_64px_-16px_rgba(0,0,0,0.06)] border border-slate-200/50 p-8 md:p-12">
+          <div className="mb-10 flex items-center gap-4">
+             <div className="w-1.5 h-8 bg-blue-600 rounded-full"></div>
+             <h2 className="text-xl font-black text-slate-950 uppercase tracking-widest">จัดการตารางเวลา</h2>
           </div>
 
           <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-6 gap-4">
@@ -140,15 +192,15 @@ export default function AdminPage() {
                 <button
                   key={slot}
                   onClick={() => toggleSlot(slot, booking)}
-                  className={`relative p-5 rounded-[2rem] text-center transition-all border-2 flex flex-col items-center justify-center gap-1 active:scale-95 ${
-                    isCustomer ? 'bg-amber-50 border-amber-200 text-amber-600' :
-                    isBlocked ? 'bg-rose-500 border-rose-500 text-white shadow-lg shadow-rose-200' :
-                    'bg-white border-slate-100 text-slate-600 hover:border-blue-400 hover:text-blue-600'
+                  className={`relative p-5 rounded-[2rem] text-center transition-all border-2 flex flex-col items-center justify-center gap-1 active:scale-95 duration-300 ${
+                    isCustomer ? 'bg-blue-50 border-blue-600 text-blue-600 shadow-lg shadow-blue-100' :
+                    isBlocked ? 'bg-slate-950 border-slate-950 text-white shadow-xl' :
+                    'bg-[#fcfcfc] border-slate-100 text-slate-300 hover:border-blue-200 hover:text-blue-500'
                   }`}
                 >
-                  <span className="text-lg font-black">{slot}</span>
-                  <span className="text-[10px] font-bold uppercase">
-                    {isCustomer ? "มีคิวลูกค้า" : isBlocked ? "ปิดรับคิว" : "เปิดว่าง"}
+                  <span className="text-lg font-black tracking-tighter">{slot}</span>
+                  <span className="text-[8px] font-black uppercase tracking-tighter">
+                    {isCustomer ? "จองแล้ว" : isBlocked ? "ปิดรับคิว" : "ว่าง"}
                   </span>
                 </button>
               );
@@ -156,55 +208,62 @@ export default function AdminPage() {
           </div>
         </div>
 
-        <div className="bg-white rounded-[2.5rem] shadow-sm border p-8">
-          <div className="flex items-center gap-3 mb-6">
-            <div className="w-2 h-8 bg-blue-600 rounded-full"></div>
-            <h2 className="text-2xl font-black text-slate-900">📋 รายชื่อลูกค้าวันที่ {new Date(date).toLocaleDateString('th-TH', { day: 'numeric', month: 'long', year: 'numeric' })}</h2>
+        {/* --- CUSTOMER LIST --- */}
+        <div className="bg-white rounded-[3.5rem] shadow-[0_32px_64px_-16px_rgba(0,0,0,0.06)] border border-slate-200/50 p-8 md:p-12">
+          <div className="mb-10 flex items-center gap-4">
+             <div className="w-1.5 h-8 bg-blue-600 rounded-full"></div>
+             <h2 className="text-xl font-black text-slate-950 uppercase tracking-widest">รายชื่อลูกค้าวันนี้</h2>
           </div>
 
-          <div className="space-y-4">
+          <div className="grid gap-4">
             {bookedSlots.filter(b => b.status !== 'blocked').length > 0 ? (
               bookedSlots
                 .filter(b => b.status !== 'blocked')
                 .sort((a, b) => a.time.localeCompare(b.time))
                 .map((booking, index) => (
-                  <div 
-                    key={index} 
-                    className="flex items-center justify-between p-6 bg-slate-50 rounded-[2rem] border border-slate-100 hover:shadow-md transition-all"
-                  >
+                  <div key={index} className="flex flex-col md:flex-row md:items-center justify-between p-6 bg-[#fcfcfc] rounded-[2.5rem] border border-slate-100 hover:bg-white hover:shadow-xl transition-all duration-500 group">
                     <div className="flex items-center gap-6">
-                      <div className="bg-white px-4 py-2 rounded-2xl shadow-sm border border-slate-200">
+                      <div className="bg-white px-6 py-3 rounded-2xl shadow-sm border border-slate-100 text-center">
                         <span className="text-xl font-black text-blue-600">{booking.time} น.</span>
                       </div>
                       <div>
-                        <h3 className="text-lg font-bold text-slate-800">{booking.name}</h3>
-                        <div className="text-sm text-slate-500 flex flex-wrap gap-x-4">
-                          <span>📱 {booking.phone || "-"}</span>
-                          <span>💇‍♂️ {booking.hair_style || "ไม่ได้ระบุ"}</span>
+                        <h3 className="text-lg font-black text-slate-950 uppercase tracking-tight">{booking.name}</h3>
+                        <div className="flex flex-wrap gap-4 mt-1">
+                          <span className="text-[10px] font-black text-slate-400 uppercase tracking-widest flex items-center gap-1">
+                            <span className="text-blue-600">โทร:</span> {booking.phone}
+                          </span>
+                          <span className="text-[10px] font-black text-slate-400 uppercase tracking-widest flex items-center gap-1">
+                            <span className="text-blue-600">ทรงผม:</span> {booking.hair_style}
+                          </span>
                         </div>
                       </div>
                     </div>
                     
                     <button 
-                      onClick={() => {
-                        if(confirm(`ยืนยันการยกเลิกคิวของคุณ ${booking.name} หรือไม่?`)) {
-                          toggleSlot(booking.time, booking);
-                        }
-                      }}
-                      className="px-4 py-2 text-rose-500 hover:bg-rose-50 rounded-xl font-bold transition-colors"
+                      onClick={() => toggleSlot(booking.time, booking)}
+                      className="mt-4 md:mt-0 px-8 py-3 bg-rose-50 text-rose-600 hover:bg-rose-600 hover:text-white rounded-2xl font-black text-[10px] uppercase tracking-widest transition-all duration-300"
                     >
-                      ยกเลิกคิว
+                      ยกเลิกคิวนี้
                     </button>
                   </div>
                 ))
             ) : (
-              <div className="text-center py-10 bg-slate-50 rounded-[2rem] border border-dashed border-slate-300">
-                <p className="text-slate-400 font-medium">ยังไม่มีลูกค้าจองคิวในวันที่เลือกครับ 😊</p>
+              <div className="text-center py-20 bg-[#fcfcfc] rounded-[3rem] border-2 border-dashed border-slate-100">
+                <div className="text-4xl mb-4">💈</div>
+                <p className="text-slate-300 font-black text-xs uppercase tracking-[0.2em]">ยังไม่มีรายการจองในวันที่เลือก</p>
               </div>
             )}
           </div>
         </div>
       </div>
+
+      <style jsx>{`
+        @keyframes fade-in {
+          from { opacity: 0; transform: translateY(20px); }
+          to { opacity: 1; transform: translateY(0); }
+        }
+        .animate-fade-in { animation: fade-in 0.8s ease-out forwards; }
+      `}</style>
     </main>
   );
 }
