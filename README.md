@@ -6,6 +6,14 @@
 
 Home page <img width="1917" height="912" alt="image" src="https://github.com/user-attachments/assets/8b6453d9-3abd-44ee-a28d-44111db87e57" />
 
+Booking page <img width="1917" height="902" alt="image" src="https://github.com/user-attachments/assets/482140a5-ea81-477a-889a-2da7832afa1a" />
+<img width="1917" height="920" alt="image" src="https://github.com/user-attachments/assets/6e300c75-cedd-41df-8f31-1852840b2dc2" />
+
+My Booking page <img width="1917" height="906" alt="image" src="https://github.com/user-attachments/assets/b6f1e2c6-3252-43f5-a1f6-8bbc67b13d3d" />
+<img width="1917" height="907" alt="image" src="https://github.com/user-attachments/assets/9be04c7b-656c-4720-8f10-860f48da5ec7" />
+
+LINE Notify <img width="460" height="410" alt="image" src="https://github.com/user-attachments/assets/3d2a6510-bb27-4cf8-8a6c-91df134bcb53" />
+
 ✨ Features 
 
 ✂️ Step-by-Step Booking Process: ขั้นตอนการจองคิวง่ายๆ 3 Step (ข้อมูลผู้ติดต่อ(login/register) -> เลือกสไตล์ทรงผม -> เลือกวันและเวลา)
