@@ -14,6 +14,7 @@ My Booking page <img width="1917" height="906" alt="image" src="https://github.c
 
 LINE Notify <img width="457" height="627" alt="image" src="https://github.com/user-attachments/assets/b5699fad-be80-498d-a213-d177edc61368" />
 
+
 ✨ Features 
 
 ✂️ Step-by-Step Booking Process: ขั้นตอนการจองคิวง่ายๆ 3 Step (ข้อมูลผู้ติดต่อ(login/register) -> เลือกสไตล์ทรงผม -> เลือกวันและเวลา)
@@ -23,6 +24,7 @@ LINE Notify <img width="457" height="627" alt="image" src="https://github.com/us
 📅 Real-time Slot Checking: ดึงข้อมูลเวลาที่ถูกจองแล้วจากฐานข้อมูล เพื่อป้องกันไม่ให้ลูกค้าจองเวลาซ้ำกัน
 
 🔔 LINE Notify Integration: ส่งข้อความแจ้งเตือนรายละเอียดการจองคิวใหม่ไปยังช่างตัดผมทันทีที่มีการจองสำเร็จ
+
 
 
 🛠️ Tech Stack
