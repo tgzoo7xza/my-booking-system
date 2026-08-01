@@ -101,7 +101,7 @@ export default function HomePage() {
             <div className="hero-card">
               <div className="relative z-10 max-w-xl">
                 <div className="badge-pill-blue">
-                  <Sparkles className="w-3.5 h-3.5" /> ยินดีต้อนรับกลับมา
+                   ยินดีต้อนรับกลับมา
                 </div>
                 <h1 className="text-2xl md:text-3xl font-extrabold tracking-tight mb-2">
                   พร้อมสำหรับการตัดผมทรงใหม่หรือยัง?
