@@ -1,36 +1,25 @@
-This is a [Next.js](https://nextjs.org) project bootstrapped with [`create-next-app`](https://nextjs.org/docs/app/api-reference/cli/create-next-app).
+💈 Barber Shop Booking System
 
-## Getting Started
+ระบบจองคิวตัดผมออนไลน์แบบ Step-by-Step ที่ช่วยให้ลูกค้าสามารถเลือกทรงผม เลือกวันและเวลาที่สะดวก พร้อมระบบป้องกันการจองคิวซ้ำ และส่งแจ้งเตือนไปยังช่างตัดผมผ่าน LINE Notify แบบ Real-time
 
-First, run the development server:
 
-```bash
-npm run dev
-# or
-yarn dev
-# or
-pnpm dev
-# or
-bun dev
-```
+✨ Features 
 
-Open [http://localhost:3000](http://localhost:3000) with your browser to see the result.
+✂️ Step-by-Step Booking Process: ขั้นตอนการจองคิวง่ายๆ 3 Step (ข้อมูลผู้ติดต่อ(login/register) -> เลือกสไตล์ทรงผม -> เลือกวันและเวลา)
 
-You can start editing the page by modifying `app/page.tsx`. The page auto-updates as you edit the file.
+💇‍♂️ Custom Hair Style Selection: มีตัวเลือกทรงผมยอดนิยม (เช่น Two block Undercut, Modern Mullet, Comma Hair) หรือเลือก "ระบุเอง" ได้ตามต้องการ
 
-This project uses [`next/font`](https://nextjs.org/docs/app/building-your-application/optimizing/fonts) to automatically optimize and load [Geist](https://vercel.com/font), a new font family for Vercel.
+📅 Real-time Slot Checking: ดึงข้อมูลเวลาที่ถูกจองแล้วจากฐานข้อมูล เพื่อป้องกันไม่ให้ลูกค้าจองเวลาซ้ำกัน
 
-## Learn More
+🔔 LINE Notify Integration: ส่งข้อความแจ้งเตือนรายละเอียดการจองคิวใหม่ไปยังช่างตัดผมทันทีที่มีการจองสำเร็จ
 
-To learn more about Next.js, take a look at the following resources:
 
-- [Next.js Documentation](https://nextjs.org/docs) - learn about Next.js features and API.
-- [Learn Next.js](https://nextjs.org/learn) - an interactive Next.js tutorial.
+🛠️ Tech Stack
 
-You can check out [the Next.js GitHub repository](https://github.com/vercel/next.js) - your feedback and contributions are welcome!
+Frontend: Next.js (React Framework), TypeScript, Tailwind CSS
 
-## Deploy on Vercel
+Backend & Database: Supabase
 
-The easiest way to deploy your Next.js app is to use the [Vercel Platform](https://vercel.com/new?utm_medium=default-template&filter=next.js&utm_source=create-next-app&utm_campaign=create-next-app-readme) from the creators of Next.js.
+API Integration: LINE Notify API
 
-Check out our [Next.js deployment documentation](https://nextjs.org/docs/app/building-your-application/deploying) for more details.
+UI Utilities: SweetAlert2 (Popups & Alerts), Lucide React (Icons)
