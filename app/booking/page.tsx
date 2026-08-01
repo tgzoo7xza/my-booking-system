@@ -1,14 +1,51 @@
 "use client";
+
 import { useState, useEffect } from "react";
 import { supabase } from "@/lib/supabase";
 import { useRouter } from "next/navigation";
 import Link from "next/link";
 import Swal from "sweetalert2";
+import { 
+  User, 
+  Phone, 
+  Scissors, 
+  Calendar, 
+  Clock, 
+  ArrowLeft, 
+  Check, 
+  Home, 
+  ListOrdered, 
+  PlusCircle,
+  AlertCircle
+} from "lucide-react";
 
 const STYLES = [
-  { id: "undercut", name: "Undercut", img: "https://images.unsplash.com/photo-1621605815971-fbc98d665033?q=80&w=200" },
-  { id: "mullet", name: "Mullet", img: "https://images.unsplash.com/photo-1599351431202-1e0f0137899a?q=80&w=200" },
-  { id: "buzzcut", name: "Buzz Cut", img: "https://images.unsplash.com/photo-1593702295094-ada74bc19ef9?q=80&w=200" },
+  { 
+    id: "Two block Undercut", 
+    name: "Two block Undercut", 
+    img: "/Two block Undercut.jpg" 
+  },
+  { 
+    id: "Comma Hair", 
+    name: "Comma Hair", 
+    img: "/Comma Hair.jpg" 
+  },
+  { 
+    id: "Modern Mullet", 
+    name: "Modern Mullet", 
+    img: "/Modern Mullet.jpg" 
+  },
+
+  { 
+    id: "Middle Part", 
+    name: "Middle Part", 
+    img: "/Middle Part.jpg" 
+  },
+  { 
+    id: " Buzz Cut", 
+    name: " Buzz Cut", 
+    img: "/Buzz Cut.jpg" 
+  },
 ];
 
 const TIME_SLOTS = [
@@ -29,20 +66,42 @@ export default function BookingPage() {
   const [bookedSlots, setBookedSlots] = useState<string[]>([]);
   
   const router = useRouter();
-  const today = new Date().toISOString().split("T")[0];
+  
+  const today = new Intl.DateTimeFormat('fr-CA', { 
+    year: 'numeric', month: '2-digit', day: '2-digit' 
+  }).format(new Date());
 
-  const sendLineNotify = async (customerName: string, bookingDate: string, bookingTime: string, hairStyle: string) => {
-    try {
-      const message = `\n📢 มีคิวจองใหม่เข้ามาครับ!\n👤 ลูกค้า: ${customerName}\n📅 วันที่: ${bookingDate}\n⏰ เวลา: ${bookingTime} น.\n💇‍♂️ ทรงผม: ${hairStyle}`;
-      await fetch("/api/line", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ message }),
-      });
-    } catch (err) {
-      console.error("LINE Notify Error:", err);
+  const isSlotPast = (slotTime: string) => {
+    if (!date) return false;
+    if (date !== today) return false;
+
+    const now = new Date();
+    const currentHour = now.getHours();
+    const currentMinute = now.getMinutes();
+
+    const [slotHour, slotMinute] = slotTime.split(":").map(Number);
+
+    if (slotHour < currentHour) {
+      return true;
+    } else if (slotHour === currentHour && slotMinute <= currentMinute) {
+      return true;
     }
+
+    return false;
   };
+
+  useEffect(() => {
+    const checkUser = async () => {
+      const { data: { user } } = await supabase.auth.getUser();
+      if (user?.user_metadata?.full_name) {
+        setName(user.user_metadata.full_name);
+      }
+      if (user?.user_metadata?.phone) {
+        setPhone(user.user_metadata.phone);
+      }
+    };
+    checkUser();
+  }, []);
 
   useEffect(() => {
     const fetchBookedSlots = async () => {
@@ -59,17 +118,52 @@ export default function BookingPage() {
     fetchBookedSlots();
   }, [date]);
 
+  const sendLineNotify = async (customerName: string, bookingDate: string, bookingTime: string, hairStyle: string) => {
+    try {
+      const message = `\n📢 มีคิวจองใหม่เข้ามาครับ!\n👤 ลูกค้า: ${customerName}\n📅 วันที่: ${bookingDate}\n⏰ เวลา: ${bookingTime} น.\n💇‍♂️ ทรงผม: ${hairStyle}`;
+      await fetch("/api/line", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ message }),
+      });
+    } catch (err) {
+      console.error("LINE Notify Error:", err);
+    }
+  };
+
   const handleBooking = async (e: React.FormEvent) => {
     e.preventDefault();
     const finalStyle = selectedStyle === "อื่นๆ" ? customStyle : selectedStyle;
 
     if (!finalStyle) {
       Swal.fire({
-        title: "ข้อมูลไม่ครบ",
-        text: "โปรดเลือกทรงผมหรือระบุทรงผมที่ต้องการ",
+        title: "กรุณาเลือกทรงผม",
+        text: "โปรดเลือกทรงผมจากรายการหรือระบุทรงผมที่ต้องการ",
         icon: "warning",
-        confirmButtonColor: "#0f172a",
-        customClass: { popup: "rounded-[2.5rem]" }
+        confirmButtonColor: "#2563eb",
+        customClass: { popup: "rounded-3xl" }
+      });
+      return;
+    }
+
+    if (!time) {
+      Swal.fire({
+        title: "กรุณาเลือกเวลา",
+        text: "โปรดเลือกช่วงเวลาที่ต้องการเข้ารับบริการ",
+        icon: "warning",
+        confirmButtonColor: "#2563eb",
+        customClass: { popup: "rounded-3xl" }
+      });
+      return;
+    }
+
+    if (isSlotPast(time)) {
+      Swal.fire({
+        title: "เวลาเลยกำหนดแล้ว",
+        text: "ช่วงเวลานี้เลยเวลาปัจจุบันไปแล้ว โปรดเลือกช่วงเวลาถัดไป",
+        icon: "error",
+        confirmButtonColor: "#2563eb",
+        customClass: { popup: "rounded-3xl" }
       });
       return;
     }
@@ -82,9 +176,9 @@ export default function BookingPage() {
         title: "กรุณาเข้าสู่ระบบ",
         text: "คุณต้องเข้าสู่ระบบก่อนจึงจะจองคิวได้",
         icon: "info",
-        confirmButtonText: "ไปหน้าล็อกอิน",
+        confirmButtonText: "ไปหน้าเข้าสู่ระบบ",
         confirmButtonColor: "#2563eb",
-        customClass: { popup: "rounded-[2.5rem]" }
+        customClass: { popup: "rounded-3xl" }
       });
       router.push("/login");
       setLoading(false);
@@ -103,22 +197,26 @@ export default function BookingPage() {
 
     if (error) {
       Swal.fire({
-        title: "จองไม่สำเร็จ",
-        text: "เวลานี้อาจถูกจองไปแล้ว โปรดลองเลือกเวลาอื่น",
+        title: "จองคิวไม่สำเร็จ",
+        text: "เวลานี้อาจถูกจองไปแล้ว โปรดเลือกช่วงเวลาอื่น",
         icon: "error",
         confirmButtonColor: "#0f172a",
-        customClass: { popup: "rounded-[2.5rem]" }
+        customClass: { popup: "rounded-3xl" }
       });
     } else {
       await sendLineNotify(name, date, time, finalStyle);
       
       await Swal.fire({
         title: "จองคิวสำเร็จ!",
-        text: "เราได้ส่งแจ้งเตือนไปที่ช่างเรียบร้อยแล้ว",
+        text: "ระบบได้รับการจองคิวของคุณเรียบร้อยแล้ว",
         icon: "success",
-        timer: 2500,
+        timer: 2000,
         showConfirmButton: false,
-        customClass: { popup: "rounded-[2.5rem]" }
+        customClass: { 
+          popup: "rounded-3xl border border-slate-100 shadow-2xl",
+          title: "font-black text-slate-900",
+          htmlContainer: "font-medium text-slate-500"
+        }
       });
       router.push("/my-bookings");
     }
@@ -126,141 +224,227 @@ export default function BookingPage() {
   };
 
   return (
-    <main className="min-h-screen bg-[#fafafa] py-12 px-6 selection:bg-blue-100 relative overflow-hidden">
-      {/* Background Decor */}
-      <div className="absolute top-[-10%] left-[-10%] w-[40%] h-[40%] bg-blue-100/20 blur-[120px] rounded-full"></div>
-
-      <div className="max-w-3xl mx-auto relative z-10 animate-fade-in">
-        <header className="flex justify-between items-center mb-12">
-          <Link href="/" className="text-[10px] font-black uppercase tracking-widest text-slate-400 hover:text-blue-600 transition-colors">
-            ← ย้อนกลับ
+    <div className="booking-page-container">
+      {/* Top App Header */}
+      <header className="booking-header">
+        <div className="booking-header-inner">
+          <span className="brand-logo">BARBER.APP</span>
+          <Link href="/" className="btn-nav-back">
+            <ArrowLeft className="w-4 h-4" /> หน้าแรก
           </Link>
-          <div className="text-[10px] font-black uppercase tracking-widest text-blue-600 bg-blue-50 px-4 py-2 rounded-full">
-            Step by Step Booking
-          </div>
-        </header>
+        </div>
+      </header>
 
-        <div className="bg-white rounded-[3.5rem] shadow-[0_32px_64px_-16px_rgba(0,0,0,0.06)] p-8 md:p-16 border border-slate-200/50">
-          <div className="mb-14 text-center">
-            <h1 className="text-4xl font-black text-slate-950 tracking-tighter uppercase mb-3">จองคิวตัดผม<span className="text-blue-600">.</span></h1>
-            <p className="text-slate-400 font-medium text-sm">ระบุข้อมูลของคุณและเลือกเวลาที่สะดวก</p>
+      <main className="max-w-3xl mx-auto px-4 sm:px-6 py-6">
+        <div className="mb-6">
+          <div className="booking-badge">
+            จองคิวรับบริการ
           </div>
-          
-          <form onSubmit={handleBooking} className="space-y-16">
-            {/* STEP 1 */}
-            <section className="space-y-6">
-              <div className="flex items-center gap-4 mb-8">
-                <span className="w-10 h-10 rounded-2xl bg-slate-950 text-white flex items-center justify-center font-black text-xs">01</span>
-                <h3 className="text-sm font-black text-slate-950 uppercase tracking-widest">ข้อมูลผู้ติดต่อ</h3>
-              </div>
-              <div className="grid md:grid-cols-2 gap-6">
-                <div className="space-y-2">
-                  <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest ml-1">ชื่อ-นามสกุล</label>
-                  <input type="text" placeholder="ระบุชื่อของคุณ" required className="w-full p-5 bg-[#fcfcfc] rounded-2xl border border-slate-100 outline-none focus:ring-4 focus:ring-blue-500/5 focus:border-blue-600 transition-all font-medium placeholder:text-slate-200" onChange={e => setName(e.target.value)} />
-                </div>
-                <div className="space-y-2">
-                  <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest ml-1">เบอร์โทรศัพท์</label>
-                  <input type="tel" placeholder="08X-XXX-XXXX" required className="w-full p-5 bg-[#fcfcfc] rounded-2xl border border-slate-100 outline-none focus:ring-4 focus:ring-blue-500/5 focus:border-blue-600 transition-all font-medium placeholder:text-slate-200" onChange={e => setPhone(e.target.value)} />
-                </div>
-              </div>
-            </section>
+          <h1 className="text-2xl sm:text-3xl font-black text-slate-900 tracking-tight">
+            ทำการจองคิวตัดผม
+          </h1>
+          <p className="text-slate-500 text-xs sm:text-sm font-medium mt-0.5">
+            ระบุรายละเอียดผู้ติดต่อ เลือกสไตล์ทรงผม และระบุรอบเวลาที่คุณสะดวก
+          </p>
+        </div>
 
-            {/* STEP 2 */}
-            <section className="space-y-6">
-              <div className="flex items-center gap-4 mb-8">
-                <span className="w-10 h-10 rounded-2xl bg-slate-950 text-white flex items-center justify-center font-black text-xs">02</span>
-                <h3 className="text-sm font-black text-slate-950 uppercase tracking-widest">เลือกสไตล์ผม</h3>
+        <form onSubmit={handleBooking} className="space-y-6">
+          {/* STEP 1: CONTACT INFO */}
+          <section className="booking-section-card">
+            <div className="section-header-title">
+              <span className="step-number-badge">1</span>
+              <h2 className="text-base font-bold text-slate-900">ข้อมูลผู้ติดต่อ</h2>
+            </div>
+
+            <div className="grid sm:grid-cols-2 gap-4">
+              <div className="space-y-1.5">
+                <label className="text-xs font-bold text-slate-700 flex items-center gap-1.5 ml-1">
+                  <User className="w-3.5 h-3.5 text-slate-400" /> ชื่อ-นามสกุล
+                </label>
+                <input 
+                  type="text" 
+                  placeholder="ระบุชื่อของคุณ" 
+                  required 
+                  value={name}
+                  onChange={e => setName(e.target.value)} 
+                  className="form-input-field" 
+                />
               </div>
-              <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
-                {STYLES.map(style => (
+
+              <div className="space-y-1.5">
+                <label className="text-xs font-bold text-slate-700 flex items-center gap-1.5 ml-1">
+                  <Phone className="w-3.5 h-3.5 text-slate-400" /> เบอร์โทรศัพท์
+                </label>
+                <input 
+                  type="tel" 
+                  placeholder="08X-XXX-XXXX" 
+                  required 
+                  value={phone}
+                  onChange={e => setPhone(e.target.value)} 
+                  className="form-input-field" 
+                />
+              </div>
+            </div>
+          </section>
+
+          {/* STEP 2: HAIR STYLE */}
+          <section className="booking-section-card">
+            <div className="section-header-title">
+              <span className="step-number-badge">2</span>
+              <h2 className="text-base font-bold text-slate-900">เลือกทรงผมที่ต้องการ</h2>
+            </div>
+
+            <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
+              {STYLES.map(style => {
+                const isSelected = selectedStyle === style.name;
+                return (
                   <div 
                     key={style.id}
                     onClick={() => setSelectedStyle(style.name)}
-                    className={`group cursor-pointer p-3 rounded-[2rem] border-2 transition-all duration-500 ${selectedStyle === style.name ? 'border-blue-600 bg-white shadow-xl shadow-blue-100 scale-[1.02]' : 'border-transparent bg-slate-50 hover:bg-slate-100'}`}
+                    className={`style-option-card ${isSelected ? 'style-option-active' : 'style-option-inactive'}`}
                   >
-                    <div className="relative overflow-hidden rounded-[1.5rem] aspect-square mb-3">
-                      <img src={style.img} className={`w-full h-full object-cover transition-transform duration-700 ${selectedStyle === style.name ? 'scale-110' : 'group-hover:scale-110'}`} alt={style.name} />
+                    <div className="aspect-square rounded-xl overflow-hidden mb-2 relative">
+                      <img 
+                        src={style.img} 
+                        alt={style.name} 
+                        className="w-full h-full object-cover transition-transform duration-300 hover:scale-105" 
+                      />
+                      {isSelected && (
+                        <div className="absolute top-1.5 right-1.5 bg-blue-600 text-white p-1 rounded-full shadow-md">
+                          <Check className="w-3 h-3" />
+                        </div>
+                      )}
                     </div>
-                    <p className={`text-center text-[10px] font-black uppercase tracking-widest ${selectedStyle === style.name ? 'text-blue-600' : 'text-slate-500'}`}>{style.name}</p>
+                    <span className={`text-xs font-bold ${isSelected ? 'text-blue-600' : 'text-slate-700'}`}>
+                      {style.name}
+                    </span>
                   </div>
-                ))}
-                <div 
-                  onClick={() => setSelectedStyle("อื่นๆ")}
-                  className={`cursor-pointer p-3 rounded-[2rem] border-2 transition-all flex flex-col items-center justify-center aspect-square ${selectedStyle === "อื่นๆ" ? 'border-blue-600 bg-white shadow-xl shadow-blue-100 scale-[1.02]' : 'border-transparent bg-slate-50 hover:bg-slate-100'}`}
-                >
-                  <div className="text-2xl mb-2">✂️</div>
-                  <p className={`text-center text-[10px] font-black uppercase tracking-widest ${selectedStyle === "อื่นๆ" ? 'text-blue-600' : 'text-slate-500'}`}>ระบุเอง</p>
-                </div>
-              </div>
-              
-              {selectedStyle === "อื่นๆ" && (
-                <div className="animate-in slide-in-from-top-4 duration-500">
-                   <input type="text" placeholder="ระบุทรงผมที่คุณต้องการ..." required className="w-full p-5 bg-white border-2 border-blue-600/20 rounded-2xl outline-none focus:border-blue-600 font-bold transition-all shadow-lg shadow-blue-500/5" onChange={e => setCustomStyle(e.target.value)} />
-                </div>
-              )}
-            </section>
+                );
+              })}
 
-            {/* STEP 3 */}
-            <section className="space-y-6">
-              <div className="flex items-center gap-4 mb-8">
-                <span className="w-10 h-10 rounded-2xl bg-slate-950 text-white flex items-center justify-center font-black text-xs">03</span>
-                <h3 className="text-sm font-black text-slate-950 uppercase tracking-widest">วันและเวลา</h3>
-              </div>
-              <div className="grid md:grid-cols-2 gap-6">
-                <div className="space-y-2">
-                  <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest ml-1">เลือกวันที่</label>
-                  <input type="date" required min={today} className="w-full p-5 bg-[#fcfcfc] rounded-2xl border border-slate-100 outline-none focus:ring-4 focus:ring-blue-500/5 focus:border-blue-600 transition-all font-black uppercase" onChange={e => { setDate(e.target.value); setTime(""); }} />
+              <div 
+                onClick={() => setSelectedStyle("อื่นๆ")}
+                className={`style-option-card flex flex-col items-center justify-center aspect-square ${
+                  selectedStyle === "อื่นๆ" ? 'style-option-active' : 'style-option-inactive'
+                }`}
+              >
+                <div className="p-2.5 bg-white text-slate-700 rounded-full shadow-sm mb-1.5">
+                  <Scissors className="w-5 h-5 text-blue-600" />
                 </div>
-                
-                <div className="space-y-2">
-                  <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest ml-1">เลือกเวลา</label>
-                  <div className="relative">
-                    <select 
-                      required 
-                      value={time}
-                      disabled={!date}
-                      className="w-full p-5 bg-[#fcfcfc] rounded-2xl border border-slate-100 outline-none focus:ring-4 focus:ring-blue-500/5 focus:border-blue-600 transition-all font-black appearance-none cursor-pointer disabled:opacity-30" 
-                      onChange={e => setTime(e.target.value)}
+                <span className={`text-xs font-bold ${selectedStyle === "อื่นๆ" ? 'text-blue-600' : 'text-slate-700'}`}>
+                  ระบุเอง
+                </span>
+              </div>
+            </div>
+
+            {selectedStyle === "อื่นๆ" && (
+              <div className="pt-2">
+                <input 
+                  type="text" 
+                  placeholder="ระบุชื่อทรงผมหรือรายละเอียดที่ต้องการ..." 
+                  required 
+                  value={customStyle}
+                  onChange={e => setCustomStyle(e.target.value)}
+                  className="w-full px-4 py-3 rounded-xl border border-blue-500 bg-white outline-none focus:ring-2 focus:ring-blue-600/20 text-sm font-medium" 
+                />
+              </div>
+            )}
+          </section>
+
+          {/* STEP 3: DATE & TIME */}
+          <section className="booking-section-card">
+            <div className="section-header-title">
+              <span className="step-number-badge">3</span>
+              <h2 className="text-base font-bold text-slate-900">เลือกวันและเวลา</h2>
+            </div>
+
+            <div className="space-y-1.5">
+              <label className="text-xs font-bold text-slate-700 flex items-center gap-1.5 ml-1">
+                <Calendar className="w-3.5 h-3.5 text-slate-400" /> เลือกวันที่
+              </label>
+              <input 
+                type="date" 
+                required 
+                min={today} 
+                value={date}
+                onChange={e => { setDate(e.target.value); setTime(""); }}
+                className="form-input-field font-bold text-slate-800" 
+              />
+            </div>
+
+            <div className="space-y-2 pt-2">
+              <label className="text-xs font-bold text-slate-700 flex items-center justify-between ml-1">
+                <span className="flex items-center gap-1.5">
+                  <Clock className="w-3.5 h-3.5 text-slate-400" /> เลือกรอบเวลา
+                </span>
+                {!date && (
+                  <span className="text-[11px] text-amber-600 font-medium flex items-center gap-1">
+                    <AlertCircle className="w-3 h-3" /> กรุณาเลือกวันที่ก่อน
+                  </span>
+                )}
+              </label>
+
+              <div className="grid grid-cols-3 sm:grid-cols-6 gap-2">
+                {TIME_SLOTS.map((slot) => {
+                  const isBooked = bookedSlots.includes(slot);
+                  const isPast = isSlotPast(slot);
+                  const isDisabled = !date || isBooked || isPast;
+                  const isSelected = time === slot;
+
+                  return (
+                    <button
+                      key={slot}
+                      type="button"
+                      disabled={isDisabled}
+                      onClick={() => setTime(slot)}
+                      className={`time-slot-btn ${
+                        isSelected
+                          ? 'time-slot-selected'
+                          : isDisabled
+                          ? 'time-slot-disabled'
+                          : 'time-slot-active'
+                      }`}
                     >
-                      <option value="">{date ? "SELECT TIME" : "CHOOSE DATE FIRST"}</option>
-                      {TIME_SLOTS.map((slot) => {
-                        const isBooked = bookedSlots.includes(slot);
-                        return (
-                          <option key={slot} value={slot} disabled={isBooked} className="font-sans">
-                            {slot} {isBooked ? "— FULL" : ""}
-                          </option>
-                        );
-                      })}
-                    </select>
-                    <div className="absolute right-6 top-1/2 -translate-y-1/2 pointer-events-none text-slate-300 text-[10px]">▼</div>
-                  </div>
-                </div>
+                      {slot}
+                    </button>
+                  );
+                })}
               </div>
-            </section>
+            </div>
+          </section>
 
-            <button 
-              type="submit" 
-              disabled={loading || !time} 
-              className="group relative w-full bg-slate-950 text-white font-black py-6 rounded-[2rem] shadow-2xl shadow-slate-950/20 active:scale-[0.98] disabled:bg-slate-200 disabled:text-slate-400 transition-all text-sm uppercase tracking-[0.3em] overflow-hidden"
-            >
-              <span className="relative z-10">{loading ? "PROCESSING..." : "CONFIRM BOOKING"}</span>
-              <div className="absolute inset-0 bg-blue-600 translate-y-full group-hover:translate-y-0 transition-transform duration-300"></div>
-            </button>
-          </form>
-        </div>
+          <button 
+            type="submit" 
+            disabled={loading || !time || !date} 
+            className="btn-submit-booking"
+          >
+            {loading ? (
+              <>
+                <div className="w-4 h-4 border-2 border-white/30 border-t-white rounded-full animate-spin" />
+                <span>กำลังทำรายการจอง...</span>
+              </>
+            ) : (
+              <span>ยืนยันการจองคิว</span>
+            )}
+          </button>
+        </form>
+      </main>
 
-        <footer className="mt-16 text-center">
-           <p className="text-[10px] font-black text-slate-300 uppercase tracking-[0.4em]">BARBER SHOP STUDIO — BOOKING SYSTEM</p>
-        </footer>
+      {/* Mobile Bottom Navigation Bar */}
+      <div className="mobile-bottom-nav">
+        <Link href="/" className="nav-item-inactive">
+          <Home className="w-5 h-5" />
+          <span>หน้าแรก</span>
+        </Link>
+        <Link href="/booking" className="nav-item-active">
+          <PlusCircle className="w-5 h-5" />
+          <span>จองคิว</span>
+        </Link>
+        <Link href="/my-bookings" className="nav-item-inactive">
+          <ListOrdered className="w-5 h-5" />
+          <span>คิวของฉัน</span>
+        </Link>
       </div>
-
-      <style jsx>{`
-        @keyframes fade-in {
-          from { opacity: 0; transform: translateY(20px); }
-          to { opacity: 1; transform: translateY(0); }
-        }
-        .animate-fade-in { animation: fade-in 0.8s ease-out forwards; }
-      `}</style>
-    </main>
+    </div>
   );
 }

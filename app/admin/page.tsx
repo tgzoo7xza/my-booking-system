@@ -1,8 +1,24 @@
 "use client";
+
 import { useState, useEffect, useCallback } from "react";
 import { supabase } from "@/lib/supabase";
 import { useRouter } from "next/navigation";
 import Swal from "sweetalert2";
+import { 
+  Calendar, 
+  Clock, 
+  User, 
+  Phone, 
+  Scissors, 
+  CheckCircle2, 
+  XCircle, 
+  Ban, 
+  LogOut, 
+  RefreshCw, 
+  Users, 
+  Server,
+  AlertCircle
+} from "lucide-react";
 
 const TIME_SLOTS = [
   "10:00", "10:30", "11:00", "11:30", "12:00", "12:30",
@@ -13,13 +29,16 @@ const TIME_SLOTS = [
 
 export default function AdminPage() {
   const router = useRouter();
-  const [date, setDate] = useState(() => {
-    return new Intl.DateTimeFormat('fr-CA', { 
-      year: 'numeric', month: '2-digit', day: '2-digit' 
-    }).format(new Date());
-  });
+  
+  // Format วันที่ปัจจุบัน YYYY-MM-DD
+  const today = new Intl.DateTimeFormat('fr-CA', { 
+    year: 'numeric', month: '2-digit', day: '2-digit' 
+  }).format(new Date());
+
+  const [date, setDate] = useState(today);
 
   const [bookedSlots, setBookedSlots] = useState<{
+    id?: string,
     time: string, 
     status: string, 
     name: string,
@@ -28,7 +47,31 @@ export default function AdminPage() {
   }[]>([]);
   const [loading, setLoading] = useState(true);
 
-  // 1. ตรวจสอบสิทธิ์ Admin (ใช้ Email ของคุณ)
+  // ฟังก์ชันเช็กว่าสล็อตเวลานั้นเลยเวลา Real-time ไปแล้วหรือยัง
+  const isSlotPast = (slotTime: string) => {
+    if (!date) return false;
+    
+    // ถ้าวันที่เลือก ไม่ใช่ วันนี้ (เช่น ดูย้อนหลัง หรือดูอนาคต)
+    if (date < today) return true; // วันที่ผ่านมาแล้ว = เลยเวลาทั้งหมด
+    if (date > today) return false; // วันอนาคต = ยังไม่ถึงเวลา
+
+    // กรณีเป็นวันที่ปัจจุบัน
+    const now = new Date();
+    const currentHour = now.getHours();
+    const currentMinute = now.getMinutes();
+
+    const [slotHour, slotMinute] = slotTime.split(":").map(Number);
+
+    if (slotHour < currentHour) {
+      return true;
+    } else if (slotHour === currentHour && slotMinute <= currentMinute) {
+      return true;
+    }
+
+    return false;
+  };
+
+  // 1. Check Admin Auth
   useEffect(() => {
     const checkAdmin = async () => {
       const { data: { session } } = await supabase.auth.getSession();
@@ -39,7 +82,8 @@ export default function AdminPage() {
           title: "ปฏิเสธการเข้าถึง",
           text: "เฉพาะผู้ดูแลร้านเท่านั้นที่สามารถเข้าถึงหน้านี้ได้",
           icon: "error",
-          confirmButtonColor: "#0f172a"
+          confirmButtonColor: "#2563eb",
+          customClass: { popup: "rounded-3xl" }
         });
         router.push("/login");
       } else {
@@ -53,12 +97,13 @@ export default function AdminPage() {
     try {
       const { data, error } = await supabase
         .from("bookings")
-        .select("booking_time, status, customer_name, phone, hair_style")
+        .select("id, booking_time, status, customer_name, phone, hair_style")
         .eq("booking_date", date)
         .neq("status", "rejected");
       
       if (error) throw error;
       setBookedSlots(data?.map(d => ({
+        id: d.id,
         time: d.booking_time,
         status: d.status,
         name: d.customer_name,
@@ -74,18 +119,57 @@ export default function AdminPage() {
     if (!loading) fetchSlots(); 
   }, [fetchSlots, loading]);
 
+  // Update Status (Confirm / Reject)
+  const handleUpdateStatus = async (id: string, newStatus: "confirmed" | "rejected") => {
+    try {
+      const { error } = await supabase
+        .from("bookings")
+        .update({ status: newStatus })
+        .eq("id", id);
+
+      if (error) throw error;
+
+      Swal.fire({
+        title: newStatus === "confirmed" ? "อนุมัติคิวเรียบร้อย" : "ปฏิเสธคิวเรียบร้อย",
+        icon: "success",
+        timer: 1500,
+        showConfirmButton: false,
+        customClass: { popup: "rounded-3xl" }
+      });
+
+      fetchSlots();
+    } catch (err: any) {
+      Swal.fire("เกิดข้อผิดพลาด", err.message, "error");
+    }
+  };
+
   const toggleSlot = async (time: string, currentBooking?: any) => {
+    if (isSlotPast(time) && !currentBooking) {
+      Swal.fire({
+        title: "ไม่สามารถดำเนินการได้",
+        text: "ช่วงเวลานี้ผ่านไปแล้ว ไม่สามารถเปลี่ยนสถานะได้",
+        icon: "info",
+        confirmButtonColor: "#2563eb",
+        customClass: { popup: "rounded-3xl" }
+      });
+      return;
+    }
+
     if (currentBooking && currentBooking.status !== "blocked") {
       const result = await Swal.fire({
-        title: "ยืนยันการยกเลิก?",
-        text: `คุณต้องการยกเลิกคิวของคุณ ${currentBooking.name} หรือไม่?`,
+        title: "ยืนยันการยกเลิก/ลบคิว?",
+        text: `คุณต้องการลบคิวของคุณ ${currentBooking.name} หรือไม่?`,
         icon: "warning",
         showCancelButton: true,
-        confirmButtonColor: "#ef4444",
-        cancelButtonColor: "#64748b",
-        confirmButtonText: "ใช่, ยกเลิกคิวนี้",
-        cancelButtonText: "ย้อนกลับ",
-        customClass: { popup: "rounded-[2rem]" }
+        confirmButtonColor: "#dc2626",
+        cancelButtonColor: "#f1f5f9",
+        confirmButtonText: "ลบคิวนี้",
+        cancelButtonText: "ยกเลิก",
+        customClass: { 
+          popup: "rounded-3xl border border-slate-100 shadow-2xl",
+          cancelButton: "text-slate-600 font-bold rounded-xl",
+          confirmButton: "font-bold rounded-xl"
+        }
       });
       if (!result.isConfirmed) return;
     }
@@ -119,9 +203,9 @@ export default function AdminPage() {
   };
 
   if (loading) return (
-    <div className="min-h-screen flex flex-col items-center justify-center bg-[#fafafa]">
-      <div className="w-12 h-12 border-4 border-blue-600 border-t-transparent rounded-full animate-spin mb-4"></div>
-      <p className="font-black text-slate-900 tracking-widest uppercase text-xs">กำลังตรวจสอบสิทธิ์ผู้ดูแล...</p>
+    <div className="min-h-screen flex flex-col items-center justify-center bg-slate-50">
+      <div className="w-8 h-8 border-3 border-blue-600/20 border-t-blue-600 rounded-full animate-spin mb-3" />
+      <span className="text-xs font-semibold text-slate-400">กำลังตรวจสอบสิทธิ์ผู้ดูแลระบบ...</span>
     </div>
   );
 
@@ -129,78 +213,131 @@ export default function AdminPage() {
   const blockedCount = bookedSlots.filter(b => b.status === 'blocked').length;
 
   return (
-    <main className="min-h-screen bg-[#fafafa] p-6 md:p-12 selection:bg-blue-100 relative">
-      <div className="max-w-6xl mx-auto space-y-8 animate-fade-in">
-        
-        {/* --- DASHBOARD HEADER --- */}
-        <header className="flex flex-col md:flex-row md:items-end justify-between gap-6">
-          <div>
-            <p className="text-[10px] font-black text-blue-600 uppercase tracking-[0.3em] mb-2">ระบบจัดการหลังบ้าน</p>
-            <h1 className="text-4xl font-black text-slate-950 tracking-tighter uppercase">แดชบอร์ด<span className="text-blue-600">.</span></h1>
+    <div className="min-h-screen bg-slate-50 text-slate-900 pb-12">
+      {/* Top App Header */}
+      <header className="sticky top-0 z-50 bg-white/80 backdrop-blur-md border-b border-slate-200/80 px-4 md:px-8 py-3.5">
+        <div className="max-w-6xl mx-auto flex justify-between items-center">
+          <div className="flex items-center gap-2 font-black text-xl tracking-tight">
+            <div className="bg-blue-600 text-white p-1.5 rounded-xl shadow-md shadow-blue-500/20">
+              <Scissors className="w-5 h-5" />
+            </div>
+            <span>BARBER<span className="text-blue-600">.ADMIN</span></span>
           </div>
-          <div className="flex items-center gap-3">
-            <input 
-              type="date" value={date} 
-              onChange={(e) => setDate(e.target.value)}
-              className="px-6 py-4 bg-white rounded-2xl border border-slate-200 outline-none ring-4 ring-blue-500/5 focus:border-blue-600 font-black transition-all"
-            />
+
+          <div className="flex items-center gap-2">
+            <button 
+              onClick={fetchSlots}
+              className="p-2 text-slate-500 hover:text-slate-900 hover:bg-slate-100 rounded-xl transition-colors"
+              title="รีเฟรชข้อมูล"
+            >
+              <RefreshCw className="w-4 h-4" />
+            </button>
             <button 
               onClick={async () => { await supabase.auth.signOut(); router.push("/"); }}
-              className="p-4 bg-slate-950 text-white rounded-2xl font-black hover:bg-blue-600 transition-all text-xs uppercase tracking-widest"
+              className="flex items-center gap-1.5 bg-slate-100 hover:bg-red-50 hover:text-red-600 text-slate-600 px-3 py-2 rounded-xl text-xs font-bold transition-all"
             >
-              ออกจากระบบ
+              <LogOut className="w-3.5 h-3.5" />
+              <span className="hidden sm:inline">ออกจากระบบ</span>
             </button>
           </div>
-        </header>
+        </div>
+      </header>
 
-        {/* --- STAT CARDS --- */}
-        <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
-          <div className="bg-blue-600 text-white p-8 rounded-[3rem] shadow-xl shadow-blue-100 relative overflow-hidden group">
-            <p className="text-blue-100 text-[10px] font-black uppercase tracking-widest mb-2">คิวจองวันนี้</p>
-            <h3 className="text-5xl font-black">{customerCount} <span className="text-xl font-normal">คิว</span></h3>
-            <div className="absolute -right-4 -bottom-4 opacity-20 text-7xl group-hover:scale-110 transition-transform">📅</div>
-          </div>
-          
-          <div className="bg-white border border-slate-200 p-8 rounded-[3rem] shadow-sm">
-            <p className="text-slate-400 text-[10px] font-black uppercase tracking-widest mb-2">ช่วงเวลาที่ปิดรับ</p>
-            <h3 className="text-5xl font-black text-slate-950">{blockedCount} <span className="text-xl font-normal">ช่วง</span></h3>
+      {/* Main Dashboard */}
+      <main className="max-w-6xl mx-auto px-4 md:px-8 py-6 space-y-6">
+        <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
+          <div>
+            <div className="inline-flex items-center gap-1.5 bg-blue-50 text-blue-700 border border-blue-100 px-3 py-1 rounded-full text-xs font-bold mb-2">
+              <Server className="w-3.5 h-3.5" /> ระบบจัดการหลังบ้าน
+            </div>
+            <h1 className="text-2xl sm:text-3xl font-black text-slate-900 tracking-tight">
+              แดชบอร์ดผู้ดูแลร้าน
+            </h1>
           </div>
 
-          <div className="bg-slate-950 text-white p-8 rounded-[3rem] flex flex-col justify-center relative overflow-hidden">
-             <p className="text-slate-400 text-[10px] font-black uppercase tracking-widest mb-2">สถานะเซิร์ฟเวอร์</p>
-             <h3 className="text-lg font-black text-green-400 flex items-center gap-2 uppercase">
-                <span className="w-2 h-2 bg-green-400 rounded-full animate-pulse"></span>
-                ออนไลน์ปกติ
-             </h3>
+          <div className="flex items-center gap-2 bg-white p-1.5 rounded-2xl border border-slate-200 shadow-sm">
+            <Calendar className="w-4 h-4 text-slate-400 ml-2" />
+            <input 
+              type="date" 
+              value={date} 
+              onChange={(e) => setDate(e.target.value)}
+              className="px-2 py-1.5 bg-transparent font-bold text-xs sm:text-sm outline-none text-slate-800"
+            />
           </div>
         </div>
 
-        {/* --- TIME SLOT MANAGER --- */}
-        <div className="bg-white rounded-[3.5rem] shadow-[0_32px_64px_-16px_rgba(0,0,0,0.06)] border border-slate-200/50 p-8 md:p-12">
-          <div className="mb-10 flex items-center gap-4">
-             <div className="w-1.5 h-8 bg-blue-600 rounded-full"></div>
-             <h2 className="text-xl font-black text-slate-950 uppercase tracking-widest">จัดการตารางเวลา</h2>
+        {/* STAT CARDS */}
+        <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
+          <div className="bg-white rounded-3xl border border-slate-200/80 p-5 shadow-sm flex items-center justify-between">
+            <div>
+              <p className="text-xs font-bold text-slate-400">คิวจองประจำเป็นวัน</p>
+              <h3 className="text-3xl font-black text-slate-900 mt-0.5">{customerCount} <span className="text-xs font-normal text-slate-500">คิว</span></h3>
+            </div>
+            <div className="w-12 h-12 bg-blue-50 text-blue-600 rounded-2xl flex items-center justify-center border border-blue-100">
+              <Users className="w-6 h-6" />
+            </div>
           </div>
 
-          <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-6 gap-4">
+          <div className="bg-white rounded-3xl border border-slate-200/80 p-5 shadow-sm flex items-center justify-between">
+            <div>
+              <p className="text-xs font-bold text-slate-400">ช่วงเวลาปิดรับ</p>
+              <h3 className="text-3xl font-black text-slate-900 mt-0.5">{blockedCount} <span className="text-xs font-normal text-slate-500">รอบ</span></h3>
+            </div>
+            <div className="w-12 h-12 bg-slate-100 text-slate-700 rounded-2xl flex items-center justify-center border border-slate-200">
+              <Ban className="w-6 h-6" />
+            </div>
+          </div>
+
+          <div className="bg-white rounded-3xl border border-slate-200/80 p-5 shadow-sm flex items-center justify-between">
+            <div>
+              <p className="text-xs font-bold text-slate-400">สถานะระบบ</p>
+              <h3 className="text-sm font-bold text-emerald-600 flex items-center gap-1.5 mt-2">
+                <span className="w-2 h-2 bg-emerald-500 rounded-full animate-pulse" />
+                ออนไลน์ปกติ
+              </h3>
+            </div>
+            <div className="w-12 h-12 bg-emerald-50 text-emerald-600 rounded-2xl flex items-center justify-center border border-emerald-100">
+              <Server className="w-6 h-6" />
+            </div>
+          </div>
+        </div>
+
+        {/* TIME SLOT MANAGER GRID */}
+        <div className="bg-white rounded-3xl border border-slate-200/80 p-5 sm:p-7 shadow-sm space-y-4">
+          <div className="flex items-center justify-between border-b border-slate-100 pb-3">
+            <h2 className="text-base font-bold text-slate-900 flex items-center gap-2">
+              <Clock className="w-4 h-4 text-blue-600" /> จัดการตารางเวลารับคิว
+            </h2>
+            <span className="text-[11px] font-medium text-slate-400 hidden sm:inline">
+              คลิกเพื่อสลับสถานะ ปิด/เปิด หรือ ลบคิว
+            </span>
+          </div>
+
+          <div className="grid grid-cols-3 sm:grid-cols-4 md:grid-cols-6 lg:grid-cols-8 gap-2">
             {TIME_SLOTS.map(slot => {
               const booking = bookedSlots.find(b => b.time === slot);
               const isBlocked = booking?.status === "blocked";
               const isCustomer = booking && !isBlocked;
+              const isPast = isSlotPast(slot);
 
               return (
                 <button
                   key={slot}
+                  disabled={isPast && !booking} // ถ้าเลยเวลาไปแล้วและไม่มีคิว ให้กดไม่ได้
                   onClick={() => toggleSlot(slot, booking)}
-                  className={`relative p-5 rounded-[2rem] text-center transition-all border-2 flex flex-col items-center justify-center gap-1 active:scale-95 duration-300 ${
-                    isCustomer ? 'bg-blue-50 border-blue-600 text-blue-600 shadow-lg shadow-blue-100' :
-                    isBlocked ? 'bg-slate-950 border-slate-950 text-white shadow-xl' :
-                    'bg-[#fcfcfc] border-slate-100 text-slate-300 hover:border-blue-200 hover:text-blue-500'
+                  className={`p-3 rounded-2xl transition-all border text-center flex flex-col items-center justify-center gap-0.5 active:scale-95 ${
+                    isCustomer 
+                      ? 'bg-blue-50 border-blue-200 text-blue-700 font-bold shadow-sm' 
+                      : isBlocked 
+                      ? 'bg-slate-900 border-slate-900 text-white font-bold' 
+                      : isPast
+                      ? 'bg-slate-100/60 border-slate-200 text-slate-400 line-through cursor-not-allowed'
+                      : 'bg-slate-50 border-slate-200 text-slate-600 hover:border-slate-300 font-medium'
                   }`}
                 >
-                  <span className="text-lg font-black tracking-tighter">{slot}</span>
-                  <span className="text-[8px] font-black uppercase tracking-tighter">
-                    {isCustomer ? "จองแล้ว" : isBlocked ? "ปิดรับคิว" : "ว่าง"}
+                  <span className="text-xs sm:text-sm font-bold">{slot}</span>
+                  <span className="text-[10px] opacity-80">
+                    {isCustomer ? "จองแล้ว" : isBlocked ? "ปิดรับ" : isPast ? "เลยเวลา" : "ว่าง"}
                   </span>
                 </button>
               );
@@ -208,62 +345,95 @@ export default function AdminPage() {
           </div>
         </div>
 
-        {/* --- CUSTOMER LIST --- */}
-        <div className="bg-white rounded-[3.5rem] shadow-[0_32px_64px_-16px_rgba(0,0,0,0.06)] border border-slate-200/50 p-8 md:p-12">
-          <div className="mb-10 flex items-center gap-4">
-             <div className="w-1.5 h-8 bg-blue-600 rounded-full"></div>
-             <h2 className="text-xl font-black text-slate-950 uppercase tracking-widest">รายชื่อลูกค้าวันนี้</h2>
+        {/* CUSTOMER BOOKINGS LIST */}
+        <div className="bg-white rounded-3xl border border-slate-200/80 p-5 sm:p-7 shadow-sm space-y-4">
+          <div className="border-b border-slate-100 pb-3 flex items-center justify-between">
+            <h2 className="text-base font-bold text-slate-900 flex items-center gap-2">
+              <Users className="w-4 h-4 text-blue-600" /> รายชื่อลูกค้าที่จองคิว
+            </h2>
+            <span className="text-xs font-bold text-blue-600 bg-blue-50 px-2.5 py-0.5 rounded-full">
+              {customerCount} รายการ
+            </span>
           </div>
 
-          <div className="grid gap-4">
+          <div className="space-y-3">
             {bookedSlots.filter(b => b.status !== 'blocked').length > 0 ? (
               bookedSlots
                 .filter(b => b.status !== 'blocked')
                 .sort((a, b) => a.time.localeCompare(b.time))
-                .map((booking, index) => (
-                  <div key={index} className="flex flex-col md:flex-row md:items-center justify-between p-6 bg-[#fcfcfc] rounded-[2.5rem] border border-slate-100 hover:bg-white hover:shadow-xl transition-all duration-500 group">
-                    <div className="flex items-center gap-6">
-                      <div className="bg-white px-6 py-3 rounded-2xl shadow-sm border border-slate-100 text-center">
-                        <span className="text-xl font-black text-blue-600">{booking.time} น.</span>
-                      </div>
-                      <div>
-                        <h3 className="text-lg font-black text-slate-950 uppercase tracking-tight">{booking.name}</h3>
-                        <div className="flex flex-wrap gap-4 mt-1">
-                          <span className="text-[10px] font-black text-slate-400 uppercase tracking-widest flex items-center gap-1">
-                            <span className="text-blue-600">โทร:</span> {booking.phone}
-                          </span>
-                          <span className="text-[10px] font-black text-slate-400 uppercase tracking-widest flex items-center gap-1">
-                            <span className="text-blue-600">ทรงผม:</span> {booking.hair_style}
-                          </span>
+                .map((booking) => {
+                  const isPast = isSlotPast(booking.time);
+
+                  return (
+                    <div 
+                      key={booking.id || booking.time} 
+                      className={`p-4 rounded-2xl border transition-all flex flex-col sm:flex-row sm:items-center justify-between gap-3 ${
+                        isPast ? 'bg-slate-50/80 border-slate-200 opacity-75' : 'bg-slate-50/50 border-slate-200/80 hover:bg-white hover:shadow-sm'
+                      }`}
+                    >
+                      <div className="flex items-center gap-3">
+                        <div className={`px-3 py-2 rounded-xl text-xs font-extrabold flex items-center gap-1 shadow-sm ${
+                          isPast ? 'bg-slate-400 text-white' : 'bg-blue-600 text-white'
+                        }`}>
+                          <Clock className="w-3.5 h-3.5" />
+                          <span>{booking.time} น.</span>
+                        </div>
+                        <div className="space-y-0.5">
+                          <div className="flex items-center gap-2">
+                            <h3 className="text-sm font-bold text-slate-900">{booking.name}</h3>
+                            <span className="text-[10px] font-bold bg-slate-100 text-slate-600 border border-slate-200 px-2 py-0.5 rounded-md">
+                              {booking.hair_style}
+                            </span>
+                            {isPast && (
+                              <span className="text-[10px] font-bold bg-amber-100 text-amber-700 border border-amber-200 px-1.5 py-0.5 rounded-md">
+                                ผ่านไปแล้ว
+                              </span>
+                            )}
+                          </div>
+                          <div className="flex items-center gap-3 text-xs text-slate-500 font-medium">
+                            <span className="flex items-center gap-1">
+                              <Phone className="w-3 h-3 text-slate-400" /> {booking.phone}
+                            </span>
+                            <span className="text-slate-300">•</span>
+                            <span className={`font-bold ${
+                              booking.status === 'confirmed' ? 'text-emerald-600' : 'text-amber-600'
+                            }`}>
+                              {booking.status === 'confirmed' ? 'อนุมัติแล้ว' : 'รอการยืนยัน'}
+                            </span>
+                          </div>
                         </div>
                       </div>
+
+                      {/* Action Buttons */}
+                      <div className="flex items-center gap-2 pt-2 sm:pt-0 border-t sm:border-t-0 border-slate-100 justify-end">
+                        {booking.status === 'pending' && booking.id && (
+                          <button
+                            onClick={() => handleUpdateStatus(booking.id!, "confirmed")}
+                            className="inline-flex items-center gap-1 bg-emerald-600 hover:bg-emerald-700 text-white px-3 py-1.5 rounded-xl text-xs font-bold transition-all shadow-sm"
+                          >
+                            <CheckCircle2 className="w-3.5 h-3.5" /> อนุมัติ
+                          </button>
+                        )}
+                        
+                        <button 
+                          onClick={() => toggleSlot(booking.time, booking)}
+                          className="inline-flex items-center gap-1 bg-slate-100 hover:bg-red-50 text-slate-600 hover:text-red-600 px-3 py-1.5 rounded-xl text-xs font-bold transition-all"
+                        >
+                          <XCircle className="w-3.5 h-3.5" /> ยกเลิก/ลบ
+                        </button>
+                      </div>
                     </div>
-                    
-                    <button 
-                      onClick={() => toggleSlot(booking.time, booking)}
-                      className="mt-4 md:mt-0 px-8 py-3 bg-rose-50 text-rose-600 hover:bg-rose-600 hover:text-white rounded-2xl font-black text-[10px] uppercase tracking-widest transition-all duration-300"
-                    >
-                      ยกเลิกคิวนี้
-                    </button>
-                  </div>
-                ))
+                  );
+                })
             ) : (
-              <div className="text-center py-20 bg-[#fcfcfc] rounded-[3rem] border-2 border-dashed border-slate-100">
-                <div className="text-4xl mb-4">💈</div>
-                <p className="text-slate-300 font-black text-xs uppercase tracking-[0.2em]">ยังไม่มีรายการจองในวันที่เลือก</p>
+              <div className="text-center py-10 bg-slate-50 rounded-2xl border border-dashed border-slate-200">
+                <AlertCircle className="w-8 h-8 text-slate-300 mx-auto mb-2" />
+                <p className="text-slate-500 font-medium text-xs">ยังไม่มีรายการจองคิวในวันที่เลือก</p>
               </div>
             )}
           </div>
         </div>
-      </div>
-
-      <style jsx>{`
-        @keyframes fade-in {
-          from { opacity: 0; transform: translateY(20px); }
-          to { opacity: 1; transform: translateY(0); }
-        }
-        .animate-fade-in { animation: fade-in 0.8s ease-out forwards; }
-      `}</style>
-    </main>
+      </main>
+    </div>
   );
 }
