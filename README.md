@@ -2,6 +2,9 @@
 
 ระบบจองคิวตัดผมออนไลน์แบบ Step-by-Step ที่ช่วยให้ลูกค้าสามารถเลือกทรงผม เลือกวันและเวลาที่สะดวก พร้อมระบบป้องกันการจองคิวซ้ำ และส่งแจ้งเตือนไปยังช่างตัดผมผ่าน LINE Notify แบบ Real-time
 
+🌐Live Demo: https://my-booking-system-rho.vercel.app/
+
+Home page <img width="1917" height="912" alt="image" src="https://github.com/user-attachments/assets/8b6453d9-3abd-44ee-a28d-44111db87e57" />
 
 ✨ Features 
 
